@@ -18,19 +18,19 @@ type availableFundsResponse struct {
 	AvailableCash float32 `json:"availableCash"`
 }
 
-type withdrawlRequest struct {
+type withdrawalRequest struct {
 	Amount float32 `json:"amount"`
 }
 
-type withdrawlResponse struct {
+type withdrawalResponse struct {
 	InvestorID                 int32   `json:"investorId"`
 	Amount                     float32 `json:"amount"`
 	EstimatedFundsTransferDate string  `json:"estimatedFundsTransferDate"`
 }
 
 var (
-	investorId        string = os.Getenv("INVESTOR_ID")
-	lendingClubAPIKey string = os.Getenv("LENDING_CLUB_API_KEY")
+	investorId        string  = os.Getenv("INVESTOR_ID")
+	lendingClubAPIKey string  = os.Getenv("LENDING_CLUB_API_KEY")
 	minimumAmount     float32 = 10.0
 )
 
@@ -56,7 +56,7 @@ func Handler(_ context.Context) {
 
 	fmt.Printf("%+v\n", availableFunds)
 	if availableFunds.AvailableCash > minimumAmount {
-		request := withdrawlRequest{Amount: availableFunds.AvailableCash}
+		request := withdrawalRequest{Amount: availableFunds.AvailableCash}
 		response, err := withdraw(client, request)
 		if err != nil {
 			panic(err)
@@ -90,28 +90,25 @@ func availableFunds(client *http.Client) (availableFunds availableFundsResponse,
 	}
 
 	err = json.Unmarshal(body, &availableFunds)
-	if err != nil {
-		return
-	}
 
 	return
 }
 
-func withdraw(client *http.Client, withdraw withdrawlRequest) (response withdrawlResponse, err error) {
+func withdraw(client *http.Client, withdraw withdrawalRequest) (response withdrawalResponse, err error) {
 	url := fmt.Sprintf("https://api.lendingclub.com/api/investor/%s/accounts/%s/funds/withdraw", "v1", investorId)
 
 	data, _ := json.Marshal(withdraw)
 	buffer := bytes.NewBuffer(data)
 	req, err := http.NewRequest(http.MethodPost, url, buffer)
 	if err != nil {
-		return response, err
+		return
 	}
 
 	req.Header.Set("Authorization", lendingClubAPIKey)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return response, err
+		return
 	}
 
 	if res.Body != nil {
@@ -120,15 +117,12 @@ func withdraw(client *http.Client, withdraw withdrawlRequest) (response withdraw
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return response, err
+		return
 	}
 
 	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return response, err
-	}
 
-	return response, nil
+	return
 }
 
 func main() {
