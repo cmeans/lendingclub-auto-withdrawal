@@ -1,0 +1,143 @@
+{
+    "Parameters": {
+        "CodeS3Bucket": {
+            "Type" : "String",
+            "Description" : "Enter the S3 bucket where the lambda code has been uploaded to"
+        },
+        "CodeS3Key": {
+            "Type" : "String",
+            "Description" : "Enter the S3 bucket key for the lambda code"
+        },
+        "LendingClubInvestorID": {
+            "Type" : "String",
+            "Description" : "Your LendingClub Investor/Account ID"
+        },
+        "LendingClubAPIKey": {
+            "Type" : "String",
+            "Description" : "Your LendingClub Developer API Key"
+        },
+        "RuleSchedule": {
+            "Type" : "String",
+            "Description" : "Cron schedule for execution (in GMT)",
+            "Default" : "cron(0 23 * * ? *)"
+        }
+    },
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "LendingClub Auto Withdrawal",
+    "Resources": {
+        "Role": {
+            "Type" : "AWS::IAM::Role",
+            "DeletionPolicy": "Delete",
+            "Properties" : {
+                "AssumeRolePolicyDocument":{
+                    "Version": "2012-10-17",
+                    "Statement": [ {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                    } ]
+                },
+                "Description" : "Allows execution of the lendingclub-auto-withdrawal lambda",
+                "MaxSessionDuration" : "3600",
+                "Path" : "/",
+                "Policies" : [ {
+                    "PolicyName": "AWSLambdaBasicExecutionRole",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                    "logs:CreateLogGroup",
+                                    "logs:CreateLogStream",
+                                    "logs:PutLogEvents"
+                                ],
+                                "Resource": "*"
+                            }
+                        ]
+                    }
+                } ],
+                "RoleName" : "lendingclub-auto-withdrawal"
+            }
+        },
+        "Lambda": {
+            "DeletionPolicy": "Delete",
+            "Type" : "AWS::Lambda::Function",
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket": {
+                        "Ref" : "CodeS3Bucket"
+                    },
+                    "S3Key": {
+                        "Ref": "CodeS3Key"
+                    }
+                },
+                "Description" : "LendingClub Auto Withdrawal routine",
+                "Environment" : {
+                    "Variables": {
+                        "INVESTOR_ID": {
+                            "Ref": "LendingClubInvestorID"
+                        },
+                        "LENDING_CLUB_API_KEY": {
+                            "Ref": "LendingClubAPIKey"
+                        }
+                    }
+                },
+                "FunctionName" : "lendingclub-auto-withdrawal",
+                "Handler" : "main",
+                "Role" : {
+                    "Fn::GetAtt" : [
+                        "Role",
+                        "Arn"
+                    ]
+                },
+                "Runtime" : "go1.x"
+            }
+        },
+        "Rule": {
+            "Type" : "AWS::Events::Rule",
+            "DeletionPolicy": "Delete",
+            "Properties" : {
+                "Description" : "Triggers the lendingclub-auto-withdrawal lambda",
+                "Name" : "trigger-lendingclub-auto-withdrawal",
+                "ScheduleExpression": {
+                    "Ref": "RuleSchedule"
+                },
+                "State": "ENABLED",
+                "Targets" : [
+                    {
+                        "Arn" : {
+                            "Fn::GetAtt": [
+                                "Lambda",
+                                "Arn"
+                            ]
+                        },
+                        "Id": "lendingclub-auto-withdrawal"
+                    }
+                ]
+            }
+        },
+        "LambdaRulePermission": {
+            "DeletionPolicy": "Delete",
+            "Type" : "AWS::Lambda::Permission",
+            "Properties" : {
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "Lambda",
+                        "Arn"
+                    ]
+                },
+                "Action": "lambda:InvokeFunction",
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {
+                    "Fn::GetAtt": [
+                        "Rule",
+                        "Arn"
+                    ]
+                }
+            }
+        }
+    }
+}
