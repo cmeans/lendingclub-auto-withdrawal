@@ -38,7 +38,7 @@ The script will compile, and then upload the lambda code to a new S3 Bucket (it 
 
 5. Go to CloudFormation.
 
-6. Create a Stack.
+6. Create a Stack (with new resources).
 
 7. Select "Template is ready".
 
