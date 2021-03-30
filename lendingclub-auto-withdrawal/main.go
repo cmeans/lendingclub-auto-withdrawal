@@ -50,7 +50,11 @@ func init() {
 }
 
 func main() {
-	lambda.Start(Handler)
+	if len(os.Args) > 1 {
+		Handler(nil)
+	} else {
+		lambda.Start(Handler)
+	}
 }
 
 func Handler(_ context.Context) {
@@ -70,7 +74,7 @@ func Handler(_ context.Context) {
 		}
 	}
 
-	fmt.Printf("%+v\n", availableFunds)
+	fmt.Printf("Available Cash: $%.2f\n", availableFunds.AvailableCash)
 
 	if investorId != fmt.Sprintf("%d", availableFunds.InvestorID) {
 		panic("INVESTOR_ID does not match returned InvestorID, invalid or mismatched with API key")
@@ -82,7 +86,7 @@ func Handler(_ context.Context) {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("%+v\n", response)
+		fmt.Printf("Transferring: %.2f\nEstimated Transfer Date: %s", response.Amount, response.EstimatedFundsTransferDate)
 	}
 }
 
@@ -125,14 +129,14 @@ func withdraw(client *http.Client, withdraw withdrawalRequest) (response withdra
 	buffer := bytes.NewBuffer(data)
 	req, err := http.NewRequest(http.MethodPost, url, buffer)
 	if err != nil {
-		return
+		return response, fmt.Errorf("unable to create withdrawal request: %w", err)
 	}
 
 	req.Header.Set("Authorization", lendingClubAPIKey)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return
+		return response, fmt.Errorf("unable execute withdrawal request: %w", err)
 	}
 
 	if res.Body != nil {
@@ -141,10 +145,13 @@ func withdraw(client *http.Client, withdraw withdrawalRequest) (response withdra
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return
+		return response, fmt.Errorf("unable to read withdrawal response body: %w", err)
 	}
 
 	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return response, fmt.Errorf("unable to unmarshal withdrawal response: %w", err)
+	}
 
 	return
 }
