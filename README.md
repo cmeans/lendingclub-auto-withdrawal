@@ -21,29 +21,43 @@ I also use the AWS CLI utility to upload the Lambda, you can avoid installing it
 * [GoLang](https://golang.org/dl/)
 * [AWS CLI](https://aws.amazon.com/cli/)
 
-## Setup
+## Setup (for Mac users)
 
 1. Get a [Lending Club Developer API Key](https://www.lendingclub.com/account/profile.action).
 
-2. Setup an AWS Account.  Assuming you only trigger the lambda to run once a day at most, you should be able to operate within the free tier, but that is dependent upon your usage, and is your responsibility to keep an eye on.
+2. Setup an AWS Account.  Assuming you only trigger the lambda to run once a day at most, you should be able to operate within the free tier, but that is dependent upon *your* usage, and is *your responsibility* to keep an eye on.
 
-3. Run this script:
-Note:  You'll need to setup your AWS account locally or at least set some environment vars so the ```aws cli``` will run without issue.
+3. Clone this repo:
 ```bash
-./uploadLambdaToS3.sh
+git clone https://github.com/cmeans/lendingclub-auto-withdrawal
 ```
-The script will compile, and then upload the lambda code to a new S3 Bucket (it creates a new bucket each time it's run) you can delete the bucket once the stack installation is complete.  Check the output of the script by viewing the file ```uploadLambdaToS3.output.txt```.  The very last line will include the bucket name, and the bucket key of the lambda...you'll need them soon.
 
-4. [Sign into the AWS console](https://aws.amazon.com/)
+4. Move into the project folder:
+```
+cd lendingclub-auto-withdrawal
+```
 
-5. Go to CloudFormation.
+5. Execute the `deploy.sh` script:
 
-6. Create a Stack (with new resources).
+You will need to setup your AWS account locally or at least set some environment variables so the `aws cli` will run without issue.
 
-7. Select "Template is ready".
+You will be prompted for your LendingClub Investor ID, Developer API key, what to name the application stack, and what [cron](https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html) schedule to use for regularly triggering the lambda.
+You *must* have your Investor ID and API Key, the last two options provide default values, which I suggest you use, at least initially.
 
-8. Select "Upload a template".
+```bash
+./deploy.sh
+```
 
-9. Click "Choose file", and navigate to where you cloned this repo, and select the file named: ```stack-template.json```.
+The script will compile, and then upload the lambda code to a new S3 Bucket (it creates a new bucket each time it's run) you can delete the bucket once the stack installation is complete.
 
-...more to come...
+6. Once the stack creation is complete, or there was an issue, you should delete the S3 bucket as it will not be used again.
+
+You can run this script, with the bucket name as it's only parameter:
+
+```bash
+./remove-bucket.sh <bucket-name>
+```
+
+7. If you mistyped your InvestorID or API Key, you can fix them in the Lambda settings via the AWS console.
+
+8. By default the routine will not initiate a transfer if the availableCash is $10.00 or less.  You can override this default value by creating a new Environment Variable in the Lambda Configuration section, with the name MINIMUM_AMOUNT set to an integer value.

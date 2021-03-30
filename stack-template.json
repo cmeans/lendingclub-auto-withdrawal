@@ -1,13 +1,5 @@
 {
     "Parameters": {
-        "CodeS3Bucket": {
-            "Type" : "String",
-            "Description" : "Enter the S3 bucket where the lambda code has been uploaded to"
-        },
-        "CodeS3Key": {
-            "Type" : "String",
-            "Description" : "Enter the S3 bucket key for the lambda code"
-        },
         "LendingClubInvestorID": {
             "Type" : "String",
             "Description" : "Your LendingClub Investor/Account ID"
@@ -23,6 +15,7 @@
         }
     },
     "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": "AWS::Serverless-2016-10-31",
     "Description": "LendingClub Auto Withdrawal",
     "Resources": {
         "Role": {
@@ -41,7 +34,7 @@
                 },
                 "Description" : "Allows execution of the lendingclub-auto-withdrawal lambda",
                 "MaxSessionDuration" : "3600",
-                "Path" : "/",
+                "Path" : "/service-role/",
                 "Policies" : [ {
                     "PolicyName": "AWSLambdaBasicExecutionRole",
                     "PolicyDocument": {
@@ -64,16 +57,12 @@
         },
         "Lambda": {
             "DeletionPolicy": "Delete",
-            "Type" : "AWS::Lambda::Function",
+            "Type" : "AWS::Serverless::Function",
             "Properties" : {
-                "Code" : {
-                    "S3Bucket": {
-                        "Ref" : "CodeS3Bucket"
-                    },
-                    "S3Key": {
-                        "Ref": "CodeS3Key"
-                    }
-                },
+                "FunctionName" : "lendingclub-auto-withdrawal",
+                "Handler" : "main",
+                "Runtime" : "go1.x",
+                "CodeUri": "./lambda/bin",
                 "Description" : "LendingClub Auto Withdrawal routine",
                 "Environment" : {
                     "Variables": {
@@ -85,15 +74,12 @@
                         }
                     }
                 },
-                "FunctionName" : "lendingclub-auto-withdrawal",
-                "Handler" : "main",
                 "Role" : {
                     "Fn::GetAtt" : [
                         "Role",
                         "Arn"
                     ]
-                },
-                "Runtime" : "go1.x"
+                }
             }
         },
         "Rule": {
