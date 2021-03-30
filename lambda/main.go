@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/lambda"
 )
@@ -39,22 +42,40 @@ func init() {
 	if ok {
 		f, err := strconv.ParseFloat(value, 32)
 		if err != nil {
-			fmt.Printf("error converting env var MINIMUM_AMOUNT: %s\n", err)
+			fmt.Printf("error converting environment variable MINIMUM_AMOUNT: %s\n", err)
 		} else {
 			minimumAmount = float32(f)
 		}
 	}
 }
 
-func Handler(_ context.Context) {
-	client := &http.Client{}
+func main() {
+	lambda.Start(Handler)
+}
 
-	availableFunds, err := availableFunds(client)
+func Handler(_ context.Context) {
+	err := validateSettings()
 	if err != nil {
 		panic(err)
 	}
 
+	client := &http.Client{}
+
+	availableFunds, err := availableFunds(client)
+	if err != nil {
+		if strings.HasPrefix(err.Error(), "unable to unmarshal response") {
+			panic("environment variable LENDING_CLUB_API_KEY appears to be invalid/expired/revoked")
+		} else {
+			panic(err)
+		}
+	}
+
 	fmt.Printf("%+v\n", availableFunds)
+
+	if investorId != fmt.Sprintf("%d", availableFunds.InvestorID) {
+		panic("INVESTOR_ID does not match returned InvestorID, invalid or mismatched with API key")
+	}
+
 	if availableFunds.AvailableCash > minimumAmount {
 		request := withdrawalRequest{Amount: availableFunds.AvailableCash}
 		response, err := withdraw(client, request)
@@ -70,14 +91,14 @@ func availableFunds(client *http.Client) (availableFunds availableFundsResponse,
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return
+		return availableFunds, fmt.Errorf("unable to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", lendingClubAPIKey)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return
+		return availableFunds, fmt.Errorf("unable execute request: %w", err)
 	}
 
 	if res.Body != nil {
@@ -86,10 +107,13 @@ func availableFunds(client *http.Client) (availableFunds availableFundsResponse,
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return
+		return availableFunds, fmt.Errorf("unable to read response body: %w", err)
 	}
 
 	err = json.Unmarshal(body, &availableFunds)
+	if err != nil {
+		return availableFunds, fmt.Errorf("unable to unmarshal response: %w", err)
+	}
 
 	return
 }
@@ -125,6 +149,22 @@ func withdraw(client *http.Client, withdraw withdrawalRequest) (response withdra
 	return
 }
 
-func main() {
-	lambda.Start(Handler)
+func validateSettings() error {
+	if investorId == "" {
+		return errors.New("environment variable INVESTOR_ID cannot be blank")
+	}
+
+	if lendingClubAPIKey == "" {
+		return errors.New("environment variable LENDING_CLUB_API_KEY cannot be blank")
+	}
+
+	if _, err := strconv.Atoi(investorId); err != nil {
+		return errors.New("environment variable INVESTOR_ID does not appears to be valid")
+	}
+
+	if _, err := base64.StdEncoding.DecodeString(lendingClubAPIKey); err != nil {
+		return errors.New("environment variable LENDING_CLUB_API_KEY does not appear to be a valid key (is not a valid Base64 encoded string)")
+	}
+
+	return nil
 }
