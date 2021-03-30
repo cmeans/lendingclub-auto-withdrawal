@@ -8,20 +8,61 @@ However, they have not provided a mechanism to automatically return our money, a
 
 Fortunately, LendingClub does provide free access to a [developer API](https://www.lendingclub.com/developers), and that is what is being leveraged here.
 
-Though my original approach was a combination of [IFTTT](https://ifttt.com) and [AWS Lambda](https://aws.amazon.com/lambda/), I later learned about [Amazon EventBridge](https://aws.amazon.com/eventbridge/), and now have a scheduled rule take care of triggering the Lambda, and everything is wrapped into a [AWS CloudFormation](https://docs.aws.amazon.com/cloudformation/index.html) [stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html).
+You have, three choices in how you want to use/deploy this routine:
 
-## Installation
+1. Compile and run the routine locally as a standalone utility.  You can run it manually, or set up a scheduler to trigger it for you automatically on whatever schedule you like.
+
+2. Deploy it as an AWS CloudFormation Stack (you will need to have/create an AWS account) and have AWS run the routine for you on whatever schedule you like.  This routine should have no problems keeping you in the Free Tier, but that's under your control, so be careful.
+
+3. You come up with some other approach, deploying it as a docker container or whatever.  You're free to use this code however you would like.
+
+## Approach #1: Standalone utility
+
+### Download & Install
+
+* [GoLang](https://golang.org/dl/)
+
+1. Get a [Lending Club Developer API Key](https://www.lendingclub.com/account/profile.action).
+
+2. Clone this repo:
+```bash
+git clone https://github.com/cmeans/lendingclub-auto-withdrawal
+```
+
+3. Move into the project code folder:
+```bash
+cd lendingclub-auto-withdrawal/lendingclub-auto-withdrawal
+```
+
+4. Compile with:
+```bash
+go build
+```
+
+5. Run the utility:
+```bash
+INVESTOR_ID=<investorID> LENDING_CLUB_API_KEY=<lendingclubAPIKey> ./lendingclub-auto-withdrawal --local
+```
+Note: You can of course use `export INVESTOR_ID=<value>` etc. so you won't need to set them on the command line.
+
+As it is compiled code, you can copy/move the utility wherever it'll be used.
+
+## Approach #2: AWS CloudFormation Stack
+
+Though my original tack was a combination of [IFTTT](https://ifttt.com) and [AWS Lambda](https://aws.amazon.com/lambda/), I later learned about [Amazon EventBridge](https://aws.amazon.com/eventbridge/), and now have a scheduled rule take care of triggering the Lambda, and everything is wrapped into a [AWS CloudFormation](https://docs.aws.amazon.com/cloudformation/index.html) [stack](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html).
+
+### Installation
 
 The AWS Lambda is written in [Go](https://golang.org/), which must be compiled for the Amazon target platform, so you will need to have/install a recent version of Go...but don't be concerned, you will not need to learn Go or much of anything else to use this stack.
 
 I also use the AWS CLI utility to upload the Lambda, you can avoid installing it and upload it yourself manually.
 
-### Download & Install
+#### Download & Install
 
 * [GoLang](https://golang.org/dl/)
 * [AWS CLI](https://aws.amazon.com/cli/)
 
-## Setup (for Mac users)
+### Setup (for Mac users)
 
 1. Get a [Lending Club Developer API Key](https://www.lendingclub.com/account/profile.action).
 
@@ -43,6 +84,7 @@ You will need to setup your AWS account locally or at least set some environment
 
 You will be prompted for your LendingClub Investor ID, Developer API key, what to name the application stack, and what [cron](https://docs.aws.amazon.com/lambda/latest/dg/services-cloudwatchevents-expressions.html) schedule to use for regularly triggering the lambda.
 You *must* have your Investor ID and API Key, the last two options provide default values, which I suggest you use, at least initially.
+Take care with the entries for the stack name and cron schedule. I'd recommend going with the defaults for now and tweaking them later as needed.
 
 ```bash
 ./deploy.sh
@@ -61,3 +103,5 @@ You can run this script, with the bucket name as it's only parameter:
 7. If you mistyped your InvestorID or API Key, you can fix them in the Lambda settings via the AWS console.
 
 8. By default the routine will not initiate a transfer if the availableCash is $10.00 or less.  You can override this default value by creating a new Environment Variable in the Lambda Configuration section, with the name MINIMUM_AMOUNT set to an integer value.
+
+9. If you encounter issues (sometimes the deployment has some timing issues) it's perfectly fine to delete the stack from AWS and redeploy it as many times as you like.
