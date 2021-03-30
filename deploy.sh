@@ -25,14 +25,14 @@ fi
 
 ECHO Preparing Resources...
 ECHO Compiling the AWS Lambda...
-pushd lambda > /dev/null
+pushd lendingclub-auto-withdrawal > /dev/null
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bin/main main.go
 popd > /dev/null
 
 ECHO Create a unique AWS S3 bucket name.
 BUCKET=my-auto-withdrawal-lambda-$(uuidgen | tr [:upper:] [:lower:])
 
-ECHO Creating the bucket.
+ECHO Creating the bucket...
 # Create a unique bucket.
 aws s3 mb s3://$BUCKET
 
@@ -52,12 +52,17 @@ aws cloudformation create-stack \
     --template-body file://stack-template.transformed.json \
     --parameters ParameterKey=LendingClubInvestorID,ParameterValue="$INVESTOR_ID" ParameterKey=LendingClubAPIKey,ParameterValue="$API_KEY" ParameterKey=RuleSchedule,ParameterValue="$RULE_SCHEDULE"
 
-ECHO "You can log into the AWS Console, CloudFormation Stacks to see if the creation process is complete."
-ECHO "Or monitor it from the command line using:"
-ECHO
-ECHO "aws cloudformation describe-stack-events --stack-name LendingClub-Auto-Withdrawal --max-items 1"
-ECHO
-ECHO "Once it's complete, run the command below to remove the S3 bucket created at the start, as it is no longer needed."
-ECHO
-ECHO "./remove-bucket.sh $BUCKET"
-ECHO
+if [[ $? != 0 ]]; then
+    ECHO Deployment error...so deleting the S3 Bucket now...
+    ./remove-bucket.sh $BUCKET
+else
+    ECHO "You can log into the AWS Console, and go to CloudFormation/Stacks to see if the creation process is complete."
+    ECHO "Or monitor it from the command line using:"
+    ECHO
+    ECHO "    aws cloudformation describe-stack-events --stack-name $STACK_NAME --max-items 1"
+    ECHO
+    ECHO "Once it's complete, run the command below to remove the S3 bucket created at the start, as it is no longer needed."
+    ECHO
+    ECHO "    ./remove-bucket.sh $BUCKET"
+    ECHO
+fi

@@ -62,7 +62,7 @@
                 "FunctionName" : "lendingclub-auto-withdrawal",
                 "Handler" : "main",
                 "Runtime" : "go1.x",
-                "CodeUri": "./lambda/bin",
+                "CodeUri": "./lendingclub-auto-withdrawal/bin",
                 "Description" : "LendingClub Auto Withdrawal routine",
                 "Environment" : {
                     "Variables": {
