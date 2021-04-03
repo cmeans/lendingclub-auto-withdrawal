@@ -51,6 +51,11 @@ func init() {
 
 func main() {
 	if len(os.Args) > 1 {
+		investorId = os.Args[1]
+		if len(os.Args) > 2 {
+			lendingClubAPIKey = os.Args[2]
+		}
+
 		Handler(nil)
 	} else {
 		lambda.Start(Handler)
@@ -60,7 +65,8 @@ func main() {
 func Handler(_ context.Context) {
 	err := validateSettings()
 	if err != nil {
-		panic(err)
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 
 	client := &http.Client{}
@@ -68,25 +74,29 @@ func Handler(_ context.Context) {
 	availableFunds, err := availableFunds(client)
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "unable to unmarshal response") {
-			panic("environment variable LENDING_CLUB_API_KEY appears to be invalid/expired/revoked")
+			fmt.Println("environment variable LENDING_CLUB_API_KEY/param 2 appears to be invalid/expired/revoked")
+			os.Exit(2)
 		} else {
-			panic(err)
+			fmt.Println(err.Error())
+			os.Exit(4)
 		}
 	}
 
 	fmt.Printf("Available Cash: $%.2f\n", availableFunds.AvailableCash)
 
 	if investorId != fmt.Sprintf("%d", availableFunds.InvestorID) {
-		panic("INVESTOR_ID does not match returned InvestorID, invalid or mismatched with API key")
+		fmt.Println("INVESTOR_ID does not match returned InvestorID, invalid or mismatched with API key")
+		os.Exit(3)
 	}
 
 	if availableFunds.AvailableCash > minimumAmount {
 		request := withdrawalRequest{Amount: availableFunds.AvailableCash}
 		response, err := withdraw(client, request)
 		if err != nil {
-			panic(err)
+			fmt.Println(err.Error())
+			os.Exit(5)
 		}
-		fmt.Printf("Transferring: %.2f\nEstimated Transfer Date: %s", response.Amount, response.EstimatedFundsTransferDate)
+		fmt.Printf("Transferring: $%.2f\nEstimated Transfer Date: %s\n", response.Amount, response.EstimatedFundsTransferDate)
 	}
 }
 
@@ -158,19 +168,19 @@ func withdraw(client *http.Client, withdraw withdrawalRequest) (response withdra
 
 func validateSettings() error {
 	if investorId == "" {
-		return errors.New("environment variable INVESTOR_ID cannot be blank")
+		return errors.New("environment variable INVESTOR_ID/param 1 cannot be blank")
 	}
 
 	if lendingClubAPIKey == "" {
-		return errors.New("environment variable LENDING_CLUB_API_KEY cannot be blank")
+		return errors.New("environment variable LENDING_CLUB_API_KEY/param 2 cannot be blank")
 	}
 
 	if _, err := strconv.Atoi(investorId); err != nil {
-		return errors.New("environment variable INVESTOR_ID does not appears to be valid")
+		return errors.New("environment variable INVESTOR_ID/param 1 does not appears to be valid")
 	}
 
 	if _, err := base64.StdEncoding.DecodeString(lendingClubAPIKey); err != nil {
-		return errors.New("environment variable LENDING_CLUB_API_KEY does not appear to be a valid key (is not a valid Base64 encoded string)")
+		return errors.New("environment variable LENDING_CLUB_API_KEY/param 2 does not appear to be a valid key (is not a valid Base64 encoded string)")
 	}
 
 	return nil

@@ -1,25 +1,5 @@
 #!/bin/bash
 
-read -p 'LendingClub Investor ID (*required): ' INVESTOR_ID
-if [[ $INVESTOR_ID == "" ]]; then
-    echo You must supply your LendingClub Investor ID.
-    exit
-fi
-
-read -p 'LendingClub API Key (*required): ' API_KEY
-if [[ $API_KEY == "" ]]; then
-    echo You must supply your LendingClub Developer API KEY.
-    exit
-fi
-
-if [[ $STACK_NAME == "" ]]; then
-    STACK_NAME="LendingClub-Auto-Withdrawal"
-fi
-
-if [[ $RULE_SCHEDULE == "" ]]; then
-    RULE_SCHEDULE="cron(0 23 * * ? *)"
-fi
-
 ECHO Preparing Resources...
 ECHO Compiling the AWS Lambda...
 pushd lendingclub-auto-withdrawal > /dev/null
@@ -43,20 +23,20 @@ aws cloudformation package \
 
 ECHO Uploading the AWS CloudFormation Stack template...to kickoff the Stack creation...
 # Create the new AWS CloudFormation Stack.
-aws cloudformation create-stack \
-    --stack-name $STACK_NAME \
+aws cloudformation update-stack \
+    --stack-name ${STACK_NAME:-LendingClub-Auto-Withdrawal} \
     --capabilities CAPABILITY_AUTO_EXPAND CAPABILITY_NAMED_IAM CAPABILITY_IAM \
     --template-body file://stack-template.transformed.json \
-    --parameters ParameterKey=LendingClubInvestorID,ParameterValue="$INVESTOR_ID" ParameterKey=LendingClubAPIKey,ParameterValue="$API_KEY" ParameterKey=RuleSchedule,ParameterValue="$RULE_SCHEDULE"
+    --parameters ParameterKey=LendingClubInvestorID,UsePreviousValue=true ParameterKey=LendingClubAPIKey,UsePreviousValue=true ParameterKey=RuleSchedule,UsePreviousValue=true
 
 if [[ $? != 0 ]]; then
     ECHO Deployment error...so deleting the S3 Bucket now...
     ./remove-bucket.sh $BUCKET
 else
-    ECHO "You can log into the AWS Console, and go to CloudFormation/Stacks to see if the creation process is complete."
+    ECHO "You can log into the AWS Console, and go to CloudFormation/Stacks to see if the update process is complete."
     ECHO "Or monitor it from the command line using:"
     ECHO
-    ECHO "    aws cloudformation describe-stack-events --stack-name $STACK_NAME --max-items 1"
+    ECHO "    aws cloudformation describe-stack-events --stack-name ${STACK_NAME:-LendingClub-Auto-Withdrawal} --max-items 1"
     ECHO
     ECHO "Once it's complete, run the command below to remove the S3 bucket created at the start, as it is no longer needed."
     ECHO
